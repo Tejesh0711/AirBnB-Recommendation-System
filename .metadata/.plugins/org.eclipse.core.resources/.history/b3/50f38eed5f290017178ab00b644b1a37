@@ -1,0 +1,18 @@
+package com.me.wordcount;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.util.stream.Stream;
+
+public class Main {
+
+	public static void main(String[] args) throws Exception {
+		// TODO Auto-generated method stub
+		BufferedReader bf = new BufferedReader(
+				new FileReader("/Users/akashnagesh/Desktop/inputToAdbms/Boston/headerfileBoston"));
+		Stream<String> lines = bf.lines();
+
+		lines.map(l -> l.split("\t")).map(l -> l.length).forEach(System.out::println);
+	}
+
+}

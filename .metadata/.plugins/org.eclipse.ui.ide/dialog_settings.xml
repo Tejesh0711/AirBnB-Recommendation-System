@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<list key="org.eclipse.ui.internal.wizards.datatransfer.SmartImportRootWizardPage.knownSources">
+		<item value="/Users/akashnagesh/Documents/workspace/MAPREDUCE/SecondarySortingMaven"/>
+		<item value="/Users/akashnagesh/Documents/workspace/MAPREDUCE/WordCount"/>
+		<item value="/Users/akashnagesh/Desktop/scala_project_team5_2017/StayRecommendationAnalysis"/>
+	</list>
+	<section name="CleanDialogSettings">
+		<item value="484" key="DIALOG_WIDTH"/>
+		<item value="true" key="TOGGLE_SELECTED"/>
+		<item value="354" key="DIALOG_HEIGHT"/>
+		<item value="478" key="DIALOG_X_ORIGIN"/>
+		<item value="190" key="DIALOG_Y_ORIGIN"/>
+	</section>
+</section>

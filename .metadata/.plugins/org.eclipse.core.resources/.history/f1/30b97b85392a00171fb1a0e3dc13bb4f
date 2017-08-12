@@ -1,0 +1,132 @@
+package com.BigData.MapReduceAnalysis;
+
+import java.io.IOException;
+
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableReducer;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.io.DoubleWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer.Context;
+
+import com.BigData.utils.HBaseTablesName;
+
+/**
+ * This is a mapreduce program to load already analyzed sentiment data into
+ * hbase. I have to do this because, unfortunately Mahout 0.9 uses hadoop-core
+ * 1.2.1 and I am using hadoop 2.7.3. THere was no easy way to make the two
+ * compatible.
+ * 
+ * @author akashnagesh
+ *
+ */
+public class SentimentAnalysisHbase {
+	public static void main(String args[]) {
+
+	}
+
+	protected static class SentimentIdentityMapper extends Mapper<Object, Text, IntWritable, DoubleWritable> {
+
+		@Override
+		protected void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+			String[] split = value.toString().split(",");
+			if (split.length != 2)
+				return;
+			try {
+				context.write(new IntWritable(Integer.parseInt(split[0])),
+						new DoubleWritable(Double.parseDouble(split[1])));
+			} catch (Exception e) {
+				// TODO: handle exception
+			}
+		}
+
+	}
+
+	protected static class TableWriterReducer
+			extends TableReducer<IntWritable, DoubleWritable, ImmutableBytesWritable> {
+
+		Connection connection;
+		Admin admin;
+		Table table;
+
+		@Override
+		protected void setup(Context context) throws IOException, InterruptedException {
+			// TODO Auto-generated method stub
+			// place = context.getConfiguration().get("Place");
+
+			connection = ConnectionFactory.createConnection(context.getConfiguration());
+			// Get Admin
+			admin = connection.getAdmin();
+
+			if (admin.tableExists(TableName.valueOf(HBaseTablesName.listingsTable))) {
+				// Use the created table if its already exists
+				// table =
+				// connection.getTable(TableName.valueOf(HBaseTablesName.tableNameForAnalysisOfListingByPlace));
+				table = connection.getTable(TableName.valueOf(HBaseTablesName.listingsTable));
+
+				if (!table.getTableDescriptor().hasFamily(Bytes.toBytes("PositiveSentiment"))) {
+
+					// Create the Column family
+					HColumnDescriptor hColumnDescriptor = new HColumnDescriptor("PositiveSentiment");
+
+					// Add the column family
+					admin.addColumn(TableName.valueOf(HBaseTablesName.listingsTable), hColumnDescriptor);
+
+				}
+			} else {
+
+				// Create an Table Descriptor with table name
+				HTableDescriptor tablefoThisJob = new HTableDescriptor(
+						TableName.valueOf(HBaseTablesName.tableNameForAnalysisOfListingByPlace));
+
+				// create an column descriptor for the table
+				HColumnDescriptor hColumnDescriptor = new HColumnDescriptor("TopTenCustomers");
+
+				// add the column family for the table
+				tablefoThisJob.addFamily(hColumnDescriptor);
+
+				// This will create an new Table in the HBase
+				admin.createTable(tablefoThisJob);
+			}
+		}
+
+		@Override
+		protected void reduce(DoubleWritable key, Iterable<IntWritable> values, Context context)
+				throws IOException, InterruptedException {
+
+			Put putToTable = new Put(Bytes.toBytes(context.getConfiguration().get("Place")));
+
+			int value = values.iterator().next().get();
+			// Adding Average price for Room type into hBase table
+			putToTable.addColumn(Bytes.toBytes("TopTenCustomers"), Bytes.toBytes(key.get()), Bytes.toBytes(value));
+
+			// Will Write to ListingsAnalyisByPlace HBase Table
+			context.write(null, putToTable);
+
+		}
+
+		@Override
+		protected void cleanup(Context context) throws IOException, InterruptedException {
+			// TODO Auto-generated method stub
+
+			// Close the Connection
+			if (connection != null)
+				connection.close();
+
+			// Close the table Connection
+			if (table != null)
+				table.close();
+		}
+	}
+
+}

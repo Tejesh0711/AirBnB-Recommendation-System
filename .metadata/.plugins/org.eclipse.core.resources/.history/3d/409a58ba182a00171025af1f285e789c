@@ -1,0 +1,19 @@
+package com.BigData.MapReduceAnalysis;
+
+import org.apache.hadoop.io.RawComparator;
+
+public class CustomComparator implements RawComparator{
+
+	@Override
+	public int compare(Object o1, Object o2) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+}

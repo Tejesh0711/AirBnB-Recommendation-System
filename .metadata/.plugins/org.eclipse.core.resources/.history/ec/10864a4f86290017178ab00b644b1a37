@@ -1,0 +1,243 @@
+package com.me.wordcount;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.FloatWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+/**
+ * This is a map-reduce program to calculate a city trend based on the % of
+ * available listings for a particular month.
+ * 
+ * @author akashnagesh
+ *
+ */
+public class CityTrend {
+
+	public static void main(String[] args) throws Exception {
+		// TODO Auto-generated method stub
+		if (args.length <= 0 || args.length % 2 != 0) {
+			System.out.println("Please sepcify the inputarguments in this format:");
+			System.out.println(
+					"hadoop jar <jar location> <path to main class> <city name> <path to input file, calender.csv>, ...");
+			System.exit(0);
+		}
+		List<String> cities = new ArrayList<>();
+		List<String> pathToInputFIles = new ArrayList<>();
+		for (int i = 0; i < args.length; i++) {
+			if (i % 2 == 0) {
+				cities.add(args[i]);
+			} else {
+				pathToInputFIles.add(args[i]);
+			}
+		}
+		for (int i = 0; i < cities.size(); i++) {
+			Configuration conf = HBaseConfiguration.create();
+			conf.set("Place", cities.get(i));
+			Job job = Job.getInstance(conf, "Citytrends-Analysis");
+			job.setJarByClass(CityTrend.class);
+			job.setMapperClass(TrendMapper.class);
+
+			job.setMapOutputKeyClass(Text.class);
+			job.setMapOutputValueClass(IntWritable.class);
+
+			job.setReducerClass(TrendReducer.class);
+			job.setOutputKeyClass(Text.class);
+			job.setOutputValueClass(FloatWritable.class);
+			FileOutputFormat.setOutputPath(job, new Path("/oppp"));
+			// job.addCacheFile(new
+			// URI("/Stay/Cache/headerForBerlin#headerForBerlin"));
+			FileInputFormat.addInputPath(job, new Path("/input/Boston/calendar.csv"));
+			// TableMapReduceUtil.initTableReducerJob(HBaseTablesName.tableNameForAnalysisOfListingByPlace,
+			// TrendHbaseReducer.class, job);
+			System.out.println("setting up job!!!!!!!!!!!!!!!!!!!!!");
+			job.waitForCompletion(true);
+		}
+		System.exit(0);
+
+	}
+
+	protected static class TrendMapper extends Mapper<Object, Text, Text, IntWritable> {
+
+		Map<Integer, String> monthMapper = new HashMap<>();
+		static {
+			File f = new File("/Users/akashnagesh/Desktop/mapredSysout");
+			try {
+				System.setOut(new PrintStream(f));
+				System.out.println("Mapper loaded!!!!");
+			} catch (Exception e) {
+
+			}
+		}
+
+		@Override
+		protected void setup(Mapper<Object, Text, Text, IntWritable>.Context context)
+				throws IOException, InterruptedException {
+			System.out.println("inside mapper setup");
+			// TODO Auto-generated method stub
+			monthMapper.put(1, "Jan");
+			monthMapper.put(2, "Feb");
+			monthMapper.put(3, "Mar");
+			monthMapper.put(4, "Apr");
+			monthMapper.put(5, "May");
+			monthMapper.put(6, "Jun");
+			monthMapper.put(7, "Jul");
+			monthMapper.put(8, "Aug");
+			monthMapper.put(9, "Sep");
+			monthMapper.put(10, "Oct");
+			monthMapper.put(11, "Nov");
+			monthMapper.put(12, "Dec");
+		}
+
+		@Override
+		protected void map(Object key, Text value, Mapper<Object, Text, Text, IntWritable>.Context context)
+				throws IOException, InterruptedException {
+			String[] split = value.toString().split(",");
+			if (split.length > 4)
+				return;
+			if (split[1].equals("listing_id"))
+				return;
+			try {
+				String date = split[1];
+				Text keyOut = new Text(monthMapper.get(Integer.parseInt(split[1].split("-")[1])));
+				IntWritable valOut = split[2].equals("t") ? new IntWritable(1) : new IntWritable(0);
+				context.write(keyOut, valOut);
+			} catch (Exception e) {
+				System.out.println("Error parsing date" + e);
+			}
+		}
+
+	}
+
+	protected static class TrendReducer extends Reducer<Text, IntWritable, Text, FloatWritable> {
+
+		@Override
+		protected void reduce(Text arg0, Iterable<IntWritable> arg1,
+				Reducer<Text, IntWritable, Text, FloatWritable>.Context arg2) throws IOException, InterruptedException {
+			int totalListings = 0;
+			int availableListings = 0;
+			for (IntWritable v : arg1) {
+				availableListings += v.get();
+				totalListings++;
+			}
+			FloatWritable valOut = new FloatWritable(((float) availableListings / totalListings) * 100);
+			arg2.write(arg0, valOut);
+		}
+
+	}
+
+	// protected static class TrendHbaseReducer extends TableReducer<Text,
+	// IntWritable, ImmutableBytesWritable> {
+	//
+	// Connection connection;
+	// Admin admin;
+	//
+	// Table table;
+	//
+	// static {
+	// File f = new File("/Users/akashnagesh/Desktop/mapredSysout1");
+	// try {
+	// System.setOut(new PrintStream(f));
+	// } catch (Exception e) {
+	//
+	// }
+	// }
+	//
+	// @Override
+	// protected void setup(Reducer<Text, IntWritable, ImmutableBytesWritable,
+	// Mutation>.Context context)
+	// throws IOException, InterruptedException {
+	// System.out.println("inside reducer setup");
+	// // TODO Auto-generated method stub
+	// connection =
+	// ConnectionFactory.createConnection(context.getConfiguration());
+	// // Get Admin
+	// admin = connection.getAdmin();
+	//
+	// if
+	// (admin.tableExists(TableName.valueOf(HBaseTablesName.tableNameForAnalysisOfListingByPlace)))
+	// {
+	// // Use the created table if its already exists to check the
+	// // column family
+	// table =
+	// connection.getTable(TableName.valueOf(HBaseTablesName.tableNameForAnalysisOfListingByPlace));
+	//
+	// if (!table.getTableDescriptor().hasFamily(Bytes.toBytes("CityTrend"))) {
+	//
+	// // Create the Column family
+	// HColumnDescriptor hColumnDescriptor = new HColumnDescriptor("CityTrend");
+	//
+	// // Add the column family
+	// admin.addColumn(TableName.valueOf(HBaseTablesName.tableNameForAnalysisOfListingByPlace),
+	// hColumnDescriptor);
+	//
+	// }
+	// } else {
+	//
+	// // Create an Table Descriptor with table name
+	// HTableDescriptor tablefoThisJob = new HTableDescriptor(
+	// TableName.valueOf(HBaseTablesName.tableNameForAnalysisOfListingByPlace));
+	//
+	// // create an column descriptor for the table
+	// HColumnDescriptor hColumnDescriptor = new HColumnDescriptor("CityTrend");
+	//
+	// // add the column family for the table
+	// tablefoThisJob.addFamily(hColumnDescriptor);
+	//
+	// // This will create an new Table in the HBase
+	// admin.createTable(tablefoThisJob);
+	// }
+	// }
+	//
+	// @Override
+	// protected void reduce(Text keyIn, Iterable<IntWritable> values,
+	// Reducer<Text, IntWritable, ImmutableBytesWritable, Mutation>.Context
+	// context)
+	// throws IOException, InterruptedException {
+	// System.out.println("adding " + keyIn);
+	// int totalListings = 0;
+	// int availableListings = 0;
+	// for (IntWritable v : values) {
+	// availableListings += v.get();
+	// totalListings++;
+	// }
+	// float valOut = ((float) availableListings / totalListings) * 100;
+	//
+	// Put putToCityTrends = new
+	// Put(Bytes.toBytes(context.getConfiguration().get("Place")));
+	// putToCityTrends.addColumn(Bytes.toBytes("CityTrend"),
+	// Bytes.toBytes(keyIn.toString()),
+	// Bytes.toBytes(valOut));
+	// context.write(null, putToCityTrends);
+	// }
+	//
+	// @Override
+	// protected void cleanup(Reducer<Text, IntWritable, ImmutableBytesWritable,
+	// Mutation>.Context context)
+	// throws IOException, InterruptedException {
+	// // TODO Auto-generated method stub
+	// if (connection != null)
+	// // Close the Connection
+	// connection.close();
+	// if (table != null)
+	// // Close the table Connection
+	// table.close();
+	// }
+	//
+	// }
+
+}

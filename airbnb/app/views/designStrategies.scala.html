@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Design Info</title>
+</head>
+<body>
+<h3>Login model</h3>
+<p>The user first tries to login, he makes a HTTP post request that is handled by Netty and inturn by our play
+    application. When we get a request from the user to login to the application, we create a <b>router</b> which
+    manages 10 login actors in <b>Roundrobin</b> fashion.<br/> We have built our <i>Data access layer</i> using
+    <b>SLICK</b> which uses <b> Functional Relational Mapping (FRM)</b> that makes it easy to access database in <i>asynchronous</i>
+    manner. We use <b>MySQL</b> as our database.Unfortunately there still isn't an asynchronous JDBC driver for MySQL.
+    So one of the way to use SLICK is to configure SLICK to use a different threadpool to query the data base. This
+    makes sure that the threads in plays <b>DEFAULT THREAD POOL</b> is not blocked making database calls.</p>
+
+<h3>Talking to kafka</h3>
+<p>Once we have the user logged in, we maintain the user session with cookies (which are encrypted by playframework).
+    This makes sure that the user does not tamper the cookies. Here, unlike our regular J2EE server/Servlet container,
+    the session object is not stored in the server. This helps us scale the application horizontally.<br/>When the user
+    makes a request for his recommendation, we create a <b>UserActor</b> with the help of plays inbuilt support for <b>WebSockets</b>
+    <br/>Choosing Kafka was a tricky decision. At times we felt it was an overkill, but given that we designed our
+    system to have only one <i>Recommendation model instance</i> we definitely needed some kind of a <i>Message broker
+        or a queuing</i> system in place so that we could buffer user data(with guaranteed data persistence and
+    ordering) when we have a lot of users concurrently seeking recommendation. We chose <i>Kafka</i> because it gives us
+    best of both worlds(Subscribe/Produce messaging system and queuing messaging system). <br/> In kafka we decided to
+    have 2 topics, one for requesting recommendation and the other for recommended listings.Once the user requests for
+    recommendation, the user actor spawns another child actor that fetches user relevant past data from our <b>HBase</b>
+    system and publishes that to Kafka. It is worthy to note that we have only <b>One producer and one consumer</b>>
+    reading data from kafka topic(which has just one partition). This design can be improvised when we have multiple
+    instances of our recommendation engine that can concurrently serve multiple users.<br/>
+    Because <b>KafkaProducer</b> is thread safe we have our multiple actors that talk to HBase publish data
+    to kafka
+    topic using the same producer concurrently.<br/> Unfortunately <i>KafkaConsumer</i> is not threadsafe. To tackle the
+    problem, we have two more actors under the actor system. Both these actors are singleton actors. <b>KafkaConsumerClientManagerActor</b>
+    which has a mutable <i>HashMap</i> that stores the userId and ActorRef and the <b>ConsumerActor</b> which is
+    blocking. The <i>UserActors</i> talk to the KafkaConsumerClientManagerActor waiting for recommended data.
+    KafkaConsumerClientManagerActor inturn requests the ConsumerActor to <i>poll</i> Kafka for records. Once there is
+    some record in the subscribed kafka topic, the ConsumerActor sends these records to KafkaConsumerClientManagerActor.
+    For each record that the KafkaConsumerClientManagerActor receives, it checks for the userId in the hashtable and
+    asynchronously sends the recommended data to the respective user Actors. The user actors then transmits this data to
+    the client over the existing WebSocket connection and then closes this socket by spilling <i>PoisonPills</i> to
+    itself.
+</p>
+</body>
+</html>

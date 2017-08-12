@@ -1,0 +1,7 @@
+package com.me.Bigdata.CustomWritable;
+
+import org.apache.hadoop.io.WritableComparator;
+
+public class TopCustomerDetails extends {
+
+}

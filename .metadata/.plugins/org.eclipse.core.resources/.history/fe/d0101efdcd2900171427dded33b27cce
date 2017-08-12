@@ -1,0 +1,5 @@
+package com.me.Bigdata.CustomWritable;
+
+public class TopCustomerDetails extends Writable{
+
+}

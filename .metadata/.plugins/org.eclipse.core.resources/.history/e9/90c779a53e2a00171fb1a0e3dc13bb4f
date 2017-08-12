@@ -1,0 +1,153 @@
+package com.BigData.MapReduceAnalysis;
+
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.mapreduce.TableReducer;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.io.DoubleWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer.Context;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+
+import com.BigData.utils.HBaseTablesName;
+
+/**
+ * This is a simple mapreduce to load selected features from the listing.csv to
+ * hBase
+ * 
+ * @author akashnagesh
+ *
+ */
+public class ListingsDataToHbase {
+	public static void main(String args[]) throws Exception {
+		if (args.length < 1) {
+			System.out.println("hadoop jar <jar location> <path to main class> <path to listings.csv> ");
+			System.out.println(
+					"Note that this job takes only 1 parameter(assuming the data is for Boston) and writes to ListingsData table");
+			System.exit(1);
+		}
+		Configuration conf = HBaseConfiguration.create();
+		Job job = Job.getInstance(conf, "put-listingData-to-hbase");
+		job.setJarByClass(SentimentAnalysisHbase.class);
+		job.setMapperClass(ListingDataSelectorMapper.class);
+		job.setMapOutputKeyClass(IntWritable.class);
+		job.setMapOutputValueClass(DoubleWritable.class);
+
+		FileInputFormat.addInputPath(job, new Path(args[0]));
+		TableMapReduceUtil.initTableReducerJob(HBaseTablesName.listingsTable, TableWriterReducer.class, job);
+		System.exit(job.waitForCompletion(true) ? 0 : 1);
+
+	}
+
+	protected static class ListingDataSelectorMapper extends Mapper<Object, Text, IntWritable, Text> {
+
+		@Override
+		protected void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+			String[] split = value.toString().split("\t");
+			if (split.length != 95)
+				return;
+			try {
+				String seperator = "~@~";
+				String valOut = split[1] + seperator + split[4] + seperator + split[15] + seperator + split[17]
+						+ seperator + split[48] + seperator + split[49];
+				context.write(new IntWritable(Integer.parseInt(split[0])), new Text(valOut));
+			} catch (Exception e) {
+				// TODO: handle exception
+			}
+		}
+
+	}
+
+	protected static class TableWriterReducer
+			extends TableReducer<IntWritable, DoubleWritable, ImmutableBytesWritable> {
+
+		Connection connection;
+		Admin admin;
+		Table table;
+
+		@Override
+		protected void setup(Context context) throws IOException, InterruptedException {
+			// TODO Auto-generated method stub
+			// place = context.getConfiguration().get("Place");
+
+			connection = ConnectionFactory.createConnection(context.getConfiguration());
+			// Get Admin
+			admin = connection.getAdmin();
+
+			if (admin.tableExists(TableName.valueOf(HBaseTablesName.listingsTable))) {
+				// Use the created table if its already exists
+				// table =
+				// connection.getTable(TableName.valueOf(HBaseTablesName.tableNameForAnalysisOfListingByPlace));
+				table = connection.getTable(TableName.valueOf(HBaseTablesName.listingsTable));
+
+				if (!table.getTableDescriptor().hasFamily(Bytes.toBytes("PositiveSentiment"))) {
+
+					// Create the Column family
+					HColumnDescriptor hColumnDescriptor = new HColumnDescriptor("PositiveSentiment");
+
+					// Add the column family
+					admin.addColumn(TableName.valueOf(HBaseTablesName.listingsTable), hColumnDescriptor);
+
+				}
+			} else {
+
+				// Create an Table Descriptor with table name
+				HTableDescriptor tablefoThisJob = new HTableDescriptor(
+						TableName.valueOf(HBaseTablesName.listingsTable));
+
+				// create an column descriptor for the table
+				HColumnDescriptor hColumnDescriptor = new HColumnDescriptor("PositiveSentiment");
+
+				// add the column family for the table
+				tablefoThisJob.addFamily(hColumnDescriptor);
+
+				// This will create an new Table in the HBase
+				admin.createTable(tablefoThisJob);
+			}
+		}
+
+		@Override
+		protected void reduce(IntWritable key, Iterable<DoubleWritable> values, Context context)
+				throws IOException, InterruptedException {
+
+			Put putToTable = new Put(Bytes.toBytes(key.get()));
+
+			putToTable.addColumn(Bytes.toBytes("PositiveSentiment"), Bytes.toBytes(key.get()),
+					Bytes.toBytes(values.iterator().next().get()));
+
+			// Will Write to ListingsAnalyisByPlace HBase Table
+			context.write(null, putToTable);
+
+		}
+
+		@Override
+		protected void cleanup(Context context) throws IOException, InterruptedException {
+			// TODO Auto-generated method stub
+
+			// Close the Connection
+			if (connection != null)
+				connection.close();
+
+			// Close the table Connection
+			if (table != null)
+				table.close();
+		}
+	}
+
+}

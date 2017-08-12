@@ -1,0 +1,57 @@
+package com.me.wordcount;
+
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.DoubleWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.KeyValueTextInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class TestJob {
+	public static void main(String[] args) throws Exception {
+
+		// TODO Auto-generated method stub
+		try {
+			Configuration conf = new Configuration();
+			Job job = Job.getInstance(conf, "word-count");
+			job.setJarByClass(TestJob.class);
+			job.setMapperClass(MapperForKeyValueTextInputFormat.class);
+			// job.setReducerClass(ReducerWordCount.class);
+			// job.setCombinerClass(ReducerWordCount.class);
+			job.setInputFormatClass(SequenceFileInputFormat.class);
+			job.setMapOutputKeyClass(Text.class);
+			job.setMapOutputValueClass(Text.class);
+
+			FileInputFormat.addInputPath(job, new Path(args[0]));
+			FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+			// cleanUpOutputDiectory(conf, args[1]);
+			System.exit(job.waitForCompletion(false) ? 0 : 1);
+		} catch (InterruptedException e) {
+			System.out.println(e);
+		} catch (ClassNotFoundException e) {
+			System.out.println(e);
+		}
+	}
+
+	protected static class MapperForKeyValueTextInputFormat extends Mapper<Object, Object, Object, Object> {
+
+		private final static IntWritable one = new IntWritable(1);
+		private final Text word = new Text();
+
+		@Override
+		public void map(Object key, Object value, Context context) throws IOException, InterruptedException {
+			context.write(value, value);
+		}
+
+	}
+
+}

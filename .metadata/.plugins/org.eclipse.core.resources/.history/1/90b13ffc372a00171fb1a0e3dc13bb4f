@@ -1,0 +1,7 @@
+package com.BigData.MapReduceAnalysis;
+
+public class SentimentAnalysisHbase {
+	public static void main(String args[]) {
+
+	}
+}

@@ -1,0 +1,98 @@
+package SentimentAnalysis.mahout_naive_bayes;
+
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.DoubleWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class SentimentalAnalysis {
+
+	public static void main(String[] args) throws Exception {
+		// TODO Auto-generated method stub
+		try {
+			Configuration conf = new Configuration();
+			Job job = Job.getInstance(conf, "sentiment-analysis");
+			job.setJarByClass(SentimentalAnalysis.class);
+			job.setMapperClass(SentimentAnalysisMapper.class);
+			job.setReducerClass(SentimentAnalysisReducer.class);
+
+			job.setMapOutputKeyClass(IntWritable.class);
+			job.setMapOutputValueClass(IntWritable.class);
+
+			job.setOutputKeyClass(IntWritable.class);
+			job.setOutputValueClass(DoubleWritable.class);
+
+			FileInputFormat.addInputPath(job, new Path(args[0]));
+			FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+			// cleanUpOutputDiectory(conf, args[1]);
+			System.exit(job.waitForCompletion(false) ? 0 : 1);
+		} catch (InterruptedException e) {
+			System.out.println(e);
+		} catch (ClassNotFoundException e) {
+			System.out.println(e);
+		}
+	}
+
+	public static class SentimentAnalysisMapper extends Mapper<Object, Text, IntWritable, IntWritable> {
+
+		NaiveBayes nv;
+
+		@Override
+		protected void setup(Mapper<Object, Text, IntWritable, IntWritable>.Context context)
+				throws IOException, InterruptedException {
+			this.nv = new NaiveBayes("/Users/akashnagesh/Desktop/input/all-labelled-data");
+			try {
+				// nv.trainModel();
+			} catch (Exception e) {
+				System.out.println(e);
+			}
+		}
+
+		@Override
+		protected void map(Object key, Text value, Mapper<Object, Text, IntWritable, IntWritable>.Context context)
+				throws IOException, InterruptedException {
+			String[] split = value.toString().split("\t");
+			if (split.length != 6) {
+				return;
+			}
+			System.out.println("Inside mapper");
+			IntWritable keyOut = new IntWritable();
+			IntWritable valueOut = new IntWritable();
+			try {
+				keyOut.set(Integer.parseInt(split[0]));
+				valueOut.set(nv.classifyNewReview(split[5]));
+			} catch (Exception e) {
+				// TODO: handle exception
+			}
+			context.write(keyOut, valueOut);
+		}
+	}
+
+	public static class SentimentAnalysisReducer
+			extends Reducer<IntWritable, IntWritable, IntWritable, DoubleWritable> {
+
+		@Override
+		protected void reduce(IntWritable keyIn, Iterable<IntWritable> values, Context context)
+				throws IOException, InterruptedException {
+			int numberOfReviews = 0;
+			int countOfPositiveReviews = 0;
+			for (IntWritable val : values) {
+				countOfPositiveReviews += val.get();
+				numberOfReviews++;
+			}
+			double percentageOfPositiveReviews = (countOfPositiveReviews / numberOfReviews) * 100;
+			context.write(keyIn, new DoubleWritable(percentageOfPositiveReviews));
+		}
+
+	}
+
+}

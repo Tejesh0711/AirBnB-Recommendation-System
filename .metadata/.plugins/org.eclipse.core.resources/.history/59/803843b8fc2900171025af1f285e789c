@@ -1,0 +1,48 @@
+package com.me.wordcount;
+
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.KeyValueTextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class TestJob {
+	public static void main(String[] args) throws Exception {
+
+		// TODO Auto-generated method stub
+		try {
+			Configuration conf = new Configuration();
+			Job job = Job.getInstance(conf, "word-count");
+			job.setJarByClass(TestJob.class);
+			job.setMapperClass(MapperP.class);
+			// job.setReducerClass(ReducerWordCount.class);
+			// job.setCombinerClass(ReducerWordCount.class);
+			job.setInputFormatClass(KeyValueTextInputFormat.class);
+
+			KeyValueTextInputFormat.addInputPath(job, new Path(args[0]));
+			FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+			// cleanUpOutputDiectory(conf, args[1]);
+			System.exit(job.waitForCompletion(false) ? 0 : 1);
+		} catch (InterruptedException e) {
+			System.out.println(e);
+		} catch (ClassNotFoundException e) {
+			System.out.println(e);
+		}
+	}
+
+	protected static class MapperP extends Mapper<Text, Text, Text, Text> {
+
+		@Override
+		protected void map(Text key, Text value, Context context) throws IOException, InterruptedException {
+			context.write(value, value);
+		}
+
+	}
+}

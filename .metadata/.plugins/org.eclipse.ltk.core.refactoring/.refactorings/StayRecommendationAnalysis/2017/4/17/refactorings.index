@@ -1,0 +1,18 @@
+1493000207972	Rename method 'classifyNewTweet'
+1493000772297	Delete elements
+1493001005609	Delete element
+1493019540920	Delete element
+1493092521251	Extract local variable 'split'
+1493135587992	Extract local variable 'split'
+1493162760537	Copy compilation unit
+1493162771513	Copy compilation unit
+1493163924265	Copy compilation unit
+1493165314469	Extract local variable 'split'
+1493167135209	Delete element
+1493167638069	Copy compilation unit
+1493167645796	Copy compilation unit
+1493167663013	Copy compilation unit
+1493168815145	Move compilation units
+1493180682405	Extract local variable 'split'
+1493182678865	Rename type 'SentimentIdentityMapper'
+1493183784214	Extract local variable 'split'
